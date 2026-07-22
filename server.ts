@@ -299,22 +299,36 @@ async function startServer() {
     otpSessions.set(email.toLowerCase(), { otp, expiresAt });
 
     try {
-      await transporter.sendMail({
-        from: '"Hệ Thống Bình Chọn Music House" <mktmusichouse2024@gmail.com>',
-        to: email,
-        subject: "Mã Xác Nhận Đăng Nhập",
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
-            <h2 style="color: #d97706; text-align: center;">Mã Xác Nhận Bình Chọn</h2>
-            <p>Chào bạn,</p>
-            <p>Bạn đã yêu cầu mã xác nhận để đăng nhập vào hệ thống bình chọn Music House. Mã của bạn là:</p>
-            <div style="text-align: center; margin: 20px 0;">
-              <span style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #1f2937; background-color: #f3f4f6; padding: 10px 20px; border-radius: 8px;">${otp}</span>
-            </div>
-            <p style="color: #6b7280; font-size: 14px;">Mã này sẽ hết hạn trong vòng 5 phút. Vui lòng không chia sẻ mã này với bất kỳ ai.</p>
+      const htmlBody = `
+        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+          <h2 style="color: #d97706; text-align: center;">Mã Xác Nhận Bình Chọn</h2>
+          <p>Chào bạn,</p>
+          <p>Bạn đã yêu cầu mã xác nhận để đăng nhập vào hệ thống bình chọn Music House. Mã của bạn là:</p>
+          <div style="text-align: center; margin: 20px 0;">
+            <span style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #1f2937; background-color: #f3f4f6; padding: 10px 20px; border-radius: 8px;">${otp}</span>
           </div>
-        `
+          <p style="color: #6b7280; font-size: 14px;">Mã này sẽ hết hạn trong vòng 5 phút. Vui lòng không chia sẻ mã này với bất kỳ ai.</p>
+        </div>
+      `;
+
+      // SỬ DỤNG GOOGLE APPS SCRIPT ĐỂ GỬI EMAIL THAY VÌ SMTP
+      const GAS_URL = process.env.MAIL_SCRIPT_URL; 
+      if (!GAS_URL) {
+        throw new Error("Chưa cấu hình MAIL_SCRIPT_URL");
+      }
+
+      const response = await fetch(GAS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({
+          to: email,
+          subject: "Mã Xác Nhận Đăng Nhập",
+          html: htmlBody
+        })
       });
+
+      if (!response.ok) throw new Error("Lỗi khi gọi Google Script");
+
       res.json({ success: true, message: "Mã OTP đã được gửi đến email của bạn." });
     } catch (error) {
       console.error("Lỗi gửi email:", error);
