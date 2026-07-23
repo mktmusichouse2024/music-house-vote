@@ -229,11 +229,19 @@ async function startServer() {
       }
       ipRequestTimestamps[clientIp].push(now);
 
-      // Anti-cheat checks
+      const teacher = await TeacherModel.findOne({ id: teacherId });
+      if (!teacher) {
+        return res.status(404).json({ success: false, message: "Không tìm thấy giáo viên này." });
+      }
+
+      // Anti-cheat checks per category
       if (deviceId) {
-        const deviceVotes = await VoteModel.countDocuments({ deviceId });
-        if (deviceVotes >= 2) {
-          return res.status(400).json({ success: false, message: "Thiết bị này đã sử dụng hết 2 lượt bình chọn." });
+        const deviceVotes = await VoteModel.find({ deviceId });
+        const deviceVotedTeacherIds = deviceVotes.map(v => v.teacherId);
+        const deviceVotedTeachers = await TeacherModel.find({ id: { $in: deviceVotedTeacherIds } }).lean();
+        const deviceVotesInCategory = deviceVotedTeachers.filter(t => t.category === teacher.category).length;
+        if (deviceVotesInCategory >= 2) {
+          return res.status(400).json({ success: false, message: `Thiết bị này đã sử dụng hết 2 lượt bình chọn cho hạng mục "${teacher.category}".` });
         }
       }
 
@@ -242,18 +250,15 @@ async function startServer() {
       
       const alreadyVotedForTeacher = userVotes.some(v => v.teacherId === teacherId);
       if (alreadyVotedForTeacher) {
-        const votedTeacher = await TeacherModel.findOne({ id: teacherId }).lean();
-        const votedName = votedTeacher ? votedTeacher.name : "giáo viên này";
-        return res.status(400).json({ success: false, message: `Tài khoản ${user.email} đã bình chọn cho ${votedName} rồi. Vui lòng dành lượt bình chọn thứ 2 cho ứng viên khác!` });
+        return res.status(400).json({ success: false, message: `Tài khoản ${user.email} đã bình chọn cho ${teacher.name} rồi. Vui lòng dành lượt bình chọn thứ 2 cho ứng viên khác!` });
       }
 
-      if (userVotes.length >= 2) {
-        return res.status(400).json({ success: false, message: `Tài khoản ${user.email} đã sử dụng hết 2 lượt bình chọn.` });
-      }
+      const userVotedTeacherIds = userVotes.map(v => v.teacherId);
+      const userVotedTeachers = await TeacherModel.find({ id: { $in: userVotedTeacherIds } }).lean();
+      const userVotesInCategory = userVotedTeachers.filter(t => t.category === teacher.category).length;
 
-      const teacher = await TeacherModel.findOne({ id: teacherId });
-      if (!teacher) {
-        return res.status(404).json({ success: false, message: "Không tìm thấy giáo viên này." });
+      if (userVotesInCategory >= 2) {
+        return res.status(400).json({ success: false, message: `Tài khoản ${user.email} đã sử dụng hết 2 lượt bình chọn cho hạng mục "${teacher.category}".` });
       }
 
       teacher.votesCount += 1;
