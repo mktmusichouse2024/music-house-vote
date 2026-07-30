@@ -7,11 +7,12 @@ import AdminPanel from "./components/AdminPanel";
 import { getFingerprint } from "./utils/fingerprint";
 import { 
   Heart, ShieldAlert, Award, Star, Trophy, Users, ShieldCheck, 
-  LogOut, CheckCircle, Key, Loader2, RefreshCw, X, Clock, Crown, Sparkles, Leaf
+  LogOut, CheckCircle, Key, Loader2, RefreshCw, X, Clock, Crown, Sparkles, Leaf, Youtube,
+  QrCode, Copy, Download, Check, Volume2, VolumeX, Eye, Radio
 } from "lucide-react";
+import { soundManager } from "./utils/sound";
 
-const CATEGORIES = ["Giáo viên được yêu thích nhất", "Giáo viên cống hiến nhất"];
-const MUSIC_NOTES = ["♪", "♫", "♩", "♬", "♭", "♮", "♯", "𝄞", "🎹", "🎻", "🎸", "🎺"];
+const MUSIC_NOTES = ["♪", "♫", "♬", "♩", "♭", "♮", "♯", "𝄪", "𝄫", "𝄞", "𝄢", "𝄡"];
 
 const FLOATING_PARTICLES = Array.from({ length: 8 }).map((_, i) => {
   const size = Math.floor(Math.random() * 5) + 3; // 3px to 8px
@@ -22,12 +23,11 @@ const FLOATING_PARTICLES = Array.from({ length: 8 }).map((_, i) => {
   return { id: i, size, delay, duration, left, isGold };
 });
 
-
-
 export default function App() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [votingEnabled, setVotingEnabled] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState("Giáo viên được yêu thích nhất");
+  const categories = Array.from(new Set(teachers.map(t => t.category)));
+  const [selectedCategory, setSelectedCategory] = useState(categories[0] || "");
   const [loading, setLoading] = useState(true);
   const [countdownEnd, setCountdownEnd] = useState<string | null>(null);
   const [appConfig, setAppConfig] = useState<{
@@ -35,12 +35,24 @@ export default function App() {
     programName: string;
     programSubtitle: string;
     programDescription: string;
+    pageTitle?: string;
+    hideResults?: boolean;
+    candidateTerm?: string;
+    subjectTerm?: string;
   }>({
     logoUrl: "/logo.svg",
     programName: "Vinh Danh Nhà Giáo",
     programSubtitle: "Music House",
-    programDescription: "Cơ hội để các học viên tri ân những cống hiến thầm lặng và bầu chọn cho người thầy được yêu thích nhất. Hãy cùng tạo ra kết quả công bằng, xứng đáng nhất!"
+    programDescription: "Cơ hội để các học viên tri ân những cống hiến thầm lặng và bầu chọn cho người thầy được yêu thích nhất. Hãy cùng tạo ra kết quả công bằng, xứng đáng nhất!",
+    pageTitle: "MUSIC HOUSE VOTE",
+    hideResults: false,
+    candidateTerm: "Giáo viên",
+    subjectTerm: "Bộ môn / Thể loại"
   });
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  const [totalPageViews, setTotalPageViews] = useState(2248);
+  const [activeOnline, setActiveOnline] = useState(12);
   const [timeLeft, setTimeLeft] = useState<{d: number, h: number, m: number, s: number} | null>(null);
   
   // Auth state
@@ -58,8 +70,19 @@ export default function App() {
   // Admin state
   const [showAdminPanel, setShowAdminPanel] = useState(false);
 
-  // Live Activity feed
+  // Live Activity & Stage Lighting feed
   const [recentVoteMessage, setRecentVoteMessage] = useState<string | null>(null);
+  const [liveFlash, setLiveFlash] = useState<{ teacherName: string; userName: string; id: string } | null>(null);
+
+  // Track votes used on this device (Mandatory 2 votes)
+  const [myVotedTeacherIds, setMyVotedTeacherIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("my_voted_teacher_ids");
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
 
   // Load active session and fetch teachers list
   useEffect(() => {
@@ -82,6 +105,8 @@ export default function App() {
     eventSource.addEventListener("sync", (event) => {
       const data = JSON.parse(event.data);
       if (data.teachers) setTeachers(data.teachers);
+      if (data.totalPageViews) setTotalPageViews(data.totalPageViews);
+      if (data.activeOnline) setActiveOnline(data.activeOnline);
       if (data.config) {
         setVotingEnabled(data.config.votingEnabled);
         setCountdownEnd(data.config.countdownEnd);
@@ -89,18 +114,51 @@ export default function App() {
           logoUrl: data.config.logoUrl || "/logo.svg",
           programName: data.config.programName || "Vinh Danh Nhà Giáo",
           programSubtitle: data.config.programSubtitle || "Music House",
-          programDescription: data.config.programDescription || "Cơ hội để các học viên tri ân những cống hiến thầm lặng và bầu chọn cho người thầy được yêu thích nhất. Hãy cùng tạo ra kết quả công bằng, xứng đáng nhất!"
+          programDescription: data.config.programDescription || "Cơ hội để các học viên tri ân những cống hiến thầm lặng và bầu chọn cho người thầy được yêu thích nhất. Hãy cùng tạo ra kết quả công bằng, xứng đáng nhất!",
+          pageTitle: data.config.pageTitle || "MUSIC HOUSE VOTE",
+          hideResults: data.config.hideResults || false,
+          candidateTerm: data.config.candidateTerm || "Giáo viên",
+          subjectTerm: data.config.subjectTerm || "Bộ môn / Thể loại",
+          bgMusicUrl: data.config.bgMusicUrl,
+          voteSoundUrl: data.config.voteSoundUrl
         });
+        if (data.config.bgMusicUrl) soundManager.setCustomMusicUrl(data.config.bgMusicUrl);
+        if (data.config.voteSoundUrl) soundManager.setCustomVoteSoundUrl(data.config.voteSoundUrl);
+        if (data.config.pageTitle) {
+          document.title = data.config.pageTitle;
+        }
       }
       setLoading(false);
+    });
+
+    eventSource.addEventListener("view", (event) => {
+      const data = JSON.parse(event.data);
+      if (data.totalPageViews) setTotalPageViews(data.totalPageViews);
+      if (data.activeOnline) setActiveOnline(data.activeOnline);
+      if (data.teacherId && data.viewsCount !== undefined) {
+        setTeachers(prev => prev.map(t => t.id === data.teacherId ? { ...t, viewsCount: data.viewsCount } : t));
+      }
+    });
+
+    eventSource.addEventListener("online", (event) => {
+      const data = JSON.parse(event.data);
+      if (data.activeOnline !== undefined) setActiveOnline(data.activeOnline);
+      if (data.totalPageViews !== undefined) setTotalPageViews(data.totalPageViews);
     });
     
     eventSource.addEventListener("vote", (event) => {
       const data = JSON.parse(event.data);
       if (data.teachers) setTeachers(data.teachers);
+      soundManager.playVoteSuccess();
       if (data.latestVote) {
         setRecentVoteMessage(`Học viên ${data.latestVote.userName} vừa bình chọn cho ${data.latestVote.teacherName}`);
+        setLiveFlash({
+          teacherName: data.latestVote.teacherName,
+          userName: data.latestVote.userName,
+          id: Math.random().toString()
+        });
         setTimeout(() => setRecentVoteMessage(null), 5500);
+        setTimeout(() => setLiveFlash(null), 4000);
       }
     });
     
@@ -112,8 +170,19 @@ export default function App() {
         logoUrl: data.logoUrl || "/logo.svg",
         programName: data.programName || "Vinh Danh Nhà Giáo",
         programSubtitle: data.programSubtitle || "Music House",
-        programDescription: data.programDescription || "Cơ hội để các học viên tri ân những cống hiến thầm lặng và bầu chọn cho người thầy được yêu thích nhất. Hãy cùng tạo ra kết quả công bằng, xứng đáng nhất!"
+        programDescription: data.programDescription || "Cơ hội để các học viên tri ân những cống hiến thầm lặng và bầu chọn cho người thầy được yêu thích nhất. Hãy cùng tạo ra kết quả công bằng, xứng đáng nhất!",
+        pageTitle: data.pageTitle || "MUSIC HOUSE VOTE",
+        hideResults: data.hideResults || false,
+        candidateTerm: data.candidateTerm || "Giáo viên",
+        subjectTerm: data.subjectTerm || "Bộ môn / Thể loại",
+        bgMusicUrl: data.bgMusicUrl,
+        voteSoundUrl: data.voteSoundUrl
       });
+      if (data.bgMusicUrl) soundManager.setCustomMusicUrl(data.bgMusicUrl);
+      if (data.voteSoundUrl) soundManager.setCustomVoteSoundUrl(data.voteSoundUrl);
+      if (data.pageTitle) {
+        document.title = data.pageTitle;
+      }
     });
 
     return () => {
@@ -147,6 +216,12 @@ export default function App() {
     return () => clearInterval(interval);
   }, [countdownEnd]);
 
+  useEffect(() => {
+    if (!selectedCategory && categories.length > 0) {
+      setSelectedCategory(categories[0]);
+    }
+  }, [categories]);
+
   const fetchTeachers = async (showLoadingSpinner = true) => {
     if (showLoadingSpinner && teachers.length === 0) setLoading(true);
     try {
@@ -156,13 +231,26 @@ export default function App() {
         setTeachers(data.teachers);
         setVotingEnabled(data.votingEnabled);
         setCountdownEnd(data.countdownEnd);
+        if (data.totalPageViews) setTotalPageViews(data.totalPageViews);
+        if (data.activeOnline) setActiveOnline(data.activeOnline);
         if (data.config) {
           setAppConfig({
             logoUrl: data.config.logoUrl || "/logo.svg",
             programName: data.config.programName || "Vinh Danh Nhà Giáo",
             programSubtitle: data.config.programSubtitle || "Music House",
-            programDescription: data.config.programDescription || "Cơ hội để các học viên tri ân những cống hiến thầm lặng và bầu chọn cho người thầy được yêu thích nhất. Hãy cùng tạo ra kết quả công bằng, xứng đáng nhất!"
+            programDescription: data.config.programDescription || "Cơ hội để các học viên tri ân những cống hiến thầm lặng và bầu chọn cho người thầy được yêu thích nhất. Hãy cùng tạo ra kết quả công bằng, xứng đáng nhất!",
+            pageTitle: data.config.pageTitle || "MUSIC HOUSE VOTE",
+            hideResults: data.config.hideResults || false,
+            candidateTerm: data.config.candidateTerm || "Giáo viên",
+            subjectTerm: data.config.subjectTerm || "Bộ môn / Thể loại",
+            bgMusicUrl: data.config.bgMusicUrl,
+            voteSoundUrl: data.config.voteSoundUrl
           });
+          if (data.config.bgMusicUrl) soundManager.setCustomMusicUrl(data.config.bgMusicUrl);
+          if (data.config.voteSoundUrl) soundManager.setCustomVoteSoundUrl(data.config.voteSoundUrl);
+          if (data.config.pageTitle) {
+            document.title = data.config.pageTitle;
+          }
         }
       }
     } catch (error) {
@@ -189,6 +277,17 @@ export default function App() {
   };
 
   const openVotingFlow = (teacher: Teacher) => {
+    soundManager.playClick();
+    if (!user) {
+      setVotingTeacher(teacher);
+      setShowAuthModal(true);
+      return;
+    }
+    if (myVotedTeacherIds.length >= 2) {
+      alert("Bạn đã sử dụng đủ 2/2 lượt bình chọn! Cảm ơn bạn đã tham gia.");
+      return;
+    }
+    fetch(`/api/teachers/${teacher.id}/view`, { method: "POST" });
     setVotingTeacher(teacher);
     setCaptchaVerified(false);
     setCaptchaResetTrigger((prev) => prev + 1);
@@ -227,6 +326,7 @@ export default function App() {
           email: user.email,
           name: user.name || "Học viên",
           picture: user.picture,
+          user: user,
           captchaToken: "turnstile-token-simulated-success",
           deviceId: deviceId
         })
@@ -234,9 +334,14 @@ export default function App() {
       const data = await response.json();
       
       if (data.success) {
+        soundManager.playVoteSuccess();
         setVoteMessage({ type: "success", text: data.message });
         // Update local teachers count immediately
         if (data.teachers) setTeachers(data.teachers);
+
+        const updated = [...myVotedTeacherIds, votingTeacher.id];
+        setMyVotedTeacherIds(updated);
+        localStorage.setItem("my_voted_teacher_ids", JSON.stringify(updated));
         
         // Auto close after 2.5s on success
         setTimeout(() => {
@@ -267,6 +372,7 @@ export default function App() {
   const rank3 = top3[2] || null;
 
   const renderTeacherCard = (teacher: Teacher, realRank: number) => {
+    const isLiveFlashed = liveFlash && liveFlash.teacherName === teacher.name;
     const ledColorClass = 
       teacher.category === "Giáo viên được yêu thích nhất" 
         ? "neon-glow-gold" 
@@ -277,9 +383,18 @@ export default function App() {
         key={teacher.id}
         layout
         initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="group relative rounded-xl border border-white/[0.04] bg-[#0c0c0e]/80 hover:bg-[#0c0c0e]/95 hover:border-gold-500/30 transition-all p-1.5 sm:p-2 flex flex-col justify-between shadow-[0_5px_15px_rgba(0,0,0,0.5)] w-full min-w-[120px] max-w-[180px]"
+        animate={{ opacity: 1, scale: isLiveFlashed ? 1.08 : 1 }}
+        className={`group relative rounded-xl border bg-[#0c0c0e]/80 hover:bg-[#0c0c0e]/95 transition-all p-1.5 sm:p-2 flex flex-col justify-between w-full min-w-[120px] max-w-[180px] ${
+          isLiveFlashed 
+            ? "border-gold-400 ring-2 ring-gold-400 shadow-[0_0_35px_rgba(234,179,8,1)] animate-pulse" 
+            : "border-white/[0.04] hover:border-gold-500/30 shadow-[0_5px_15px_rgba(0,0,0,0.5)]"
+        }`}
       >
+        {isLiveFlashed && (
+          <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-40 bg-gradient-to-r from-gold-400 to-amber-500 text-black px-2 py-0.5 rounded-full font-mono text-[9px] font-black tracking-wider uppercase shadow-[0_0_15px_rgba(234,179,8,1)] animate-bounce flex items-center gap-1 shrink-0 whitespace-nowrap">
+            🔥 +1 VOTE MỚI!
+          </div>
+        )}
         <div className={`absolute top-0 left-4 right-4 h-[1px] bg-gradient-to-r opacity-0 group-hover:opacity-100 transition-opacity ${
           teacher.category === "Giáo viên được yêu thích nhất" 
             ? "from-gold-600 to-gold-400" 
@@ -300,8 +415,13 @@ export default function App() {
             </div>
           </div>
           
-          <h3 className="text-[11px] sm:text-xs font-bold text-center text-white group-hover:text-gold-300 font-display line-clamp-1">
+          <h3 className="text-[11px] sm:text-xs font-bold text-center text-white group-hover:text-gold-300 font-display line-clamp-1 flex items-center gap-1">
             {teacher.name}
+            {teacher.youtubeUrl && (
+              <a href={teacher.youtubeUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-red-500 hover:text-red-400">
+                <Youtube className="w-3 h-3" />
+              </a>
+            )}
           </h3>
           <span className="text-[8px] font-bold tracking-widest text-gold-400/80 uppercase font-mono mt-0.5 line-clamp-1">
             {teacher.subject}
@@ -309,9 +429,15 @@ export default function App() {
         </div>
 
         <div className="pt-2 mt-2 border-t border-white/[0.02] flex items-center justify-between w-full">
-          <div className="flex items-center gap-1">
-            <Heart className="w-3 h-3 text-rose-500" />
-            <span className="text-[10px] font-bold font-mono text-white">{teacher.votesCount}</span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              <Heart className="w-3 h-3 text-rose-500" />
+              <span className="text-[10px] font-bold font-mono text-white">{teacher.votesCount === -1 ? '***' : teacher.votesCount}</span>
+            </div>
+            <div className="flex items-center gap-0.5 text-[9px] font-mono text-slate-400" title="Số lượt xem">
+              <Eye className="w-2.5 h-2.5 text-gold-400/80" />
+              <span>{teacher.viewsCount || 0}</span>
+            </div>
           </div>
           <button
             id={`vote-teacher-${teacher.id}-btn`}
@@ -383,8 +509,39 @@ export default function App() {
           </div>
         )}
 
-        {/* User Session Info / Google Login button */}
-        <div className="flex items-center gap-2">
+        {/* User Session Info / Google Login button / Sound & View Counter */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Views & Live Counter Badge */}
+          <div className="flex items-center gap-2 bg-black/50 border border-gold-500/20 px-2.5 py-1 rounded-full text-[10px] font-mono text-slate-300 shadow-inner">
+            <span className="flex items-center gap-1 text-gold-400 font-bold">
+              <Eye className="w-3.5 h-3.5 text-gold-400" />
+              {totalPageViews.toLocaleString()} lượt xem
+            </span>
+            <span className="text-white/20">|</span>
+            <span className="flex items-center gap-1 text-emerald-400 font-bold">
+              <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+              {activeOnline} trực tuyến
+            </span>
+          </div>
+
+          {/* Sound Toggle Button */}
+          <button
+            type="button"
+            onClick={() => {
+              soundManager.playClick();
+              setIsMusicPlaying(soundManager.toggleBGM());
+            }}
+            className={`px-2.5 py-1 rounded-full border transition flex items-center gap-1.5 text-[10px] font-bold cursor-pointer ${
+              isMusicPlaying 
+                ? "border-gold-500/50 bg-gold-500/20 text-gold-300 shadow-[0_0_10px_rgba(212,175,55,0.3)] animate-pulse" 
+                : "border-gold-500/30 bg-black/50 hover:bg-gold-500/10 text-slate-200"
+            }`}
+            title={isMusicPlaying ? "Tắt Nhạc Nền Sự Kiện" : "Bật Nhạc Nền Sự Kiện"}
+          >
+            {isMusicPlaying ? <Volume2 className="w-3.5 h-3.5 text-gold-400" /> : <VolumeX className="w-3.5 h-3.5 text-slate-400" />}
+            <span>{isMusicPlaying ? "Nhạc nền" : "Bật nhạc"}</span>
+          </button>
+
           {user ? (
             <div className="flex items-center gap-2 bg-gold-950/10 border border-gold-500/20 p-1 pr-3 rounded-full shadow-inner">
               <img
@@ -417,17 +574,128 @@ export default function App() {
           
           <button
             type="button"
-            onClick={() => setShowAdminPanel(true)}
-            className="p-1.5 rounded-full border border-gold-500/20 bg-gold-500/5 hover:bg-gold-500/10 text-gold-500 transition"
-            title="Admin"
+            onClick={() => setShowQrModal(true)}
+            className="p-1.5 rounded-full border border-gold-500/20 bg-gold-500/5 hover:bg-gold-500/10 text-gold-400 transition"
+            title="Mã QR Truy Cập"
           >
-            <Key className="w-3.5 h-3.5" />
+            <QrCode className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowAdminPanel(true)}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full border border-gold-500/30 bg-gold-500/10 hover:bg-gold-500/20 text-gold-400 text-[10px] font-bold transition shadow-sm cursor-pointer"
+            title="Bảng Quản Trị Admin"
+          >
+            <Key className="w-3.5 h-3.5 text-gold-400" />
+            <span>Admin</span>
           </button>
         </div>
       </header>
 
+      {/* REALTIME STAGE LIGHTING & CELEBRATION FLASH OVERLAY */}
+      <AnimatePresence>
+        {liveFlash && (
+          <>
+            {/* Full Screen Golden Light Beam Flash & Strobe Aura */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 0.95, 0.45, 0.85, 0] }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 3.8, times: [0, 0.1, 0.3, 0.6, 1] }}
+              className="fixed inset-0 pointer-events-none z-50 overflow-hidden"
+            >
+              {/* Radial Golden Laser Spotlight */}
+              <div className="absolute inset-0 bg-gradient-to-r from-amber-500/30 via-gold-500/50 to-amber-500/30 mix-blend-screen animate-pulse" />
+              <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[900px] h-[900px] bg-gradient-to-b from-amber-400/60 via-gold-500/30 to-transparent rounded-full blur-3xl animate-pulse" />
+              
+              {/* Stage Spotlights Flanking left & right */}
+              <div className="absolute top-0 left-0 w-[450px] h-full bg-gradient-to-tr from-gold-500/40 via-amber-400/20 to-transparent -rotate-12 blur-2xl" />
+              <div className="absolute top-0 right-0 w-[450px] h-full bg-gradient-to-tl from-gold-500/40 via-amber-400/20 to-transparent rotate-12 blur-2xl" />
+
+              {/* Floating Celebration Particles */}
+              <div className="absolute inset-0 flex items-center justify-around">
+                <span className="text-5xl animate-bounce delay-100 drop-shadow-[0_0_15px_#fcd34d]">✨</span>
+                <span className="text-6xl animate-bounce delay-300 drop-shadow-[0_0_20px_#fcd34d]">🏆</span>
+                <span className="text-5xl animate-bounce delay-200 drop-shadow-[0_0_15px_#fcd34d]">🌟</span>
+                <span className="text-6xl animate-bounce delay-500 drop-shadow-[0_0_20px_#fcd34d]">🎉</span>
+              </div>
+            </motion.div>
+
+            {/* Glowing Live Celebration Notification Ticker Banner */}
+            <motion.div
+              initial={{ opacity: 0, y: -100, scale: 0.8 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -80, scale: 0.9 }}
+              transition={{ type: "spring", stiffness: 400, damping: 25 }}
+              className="fixed top-12 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg px-4 pointer-events-none"
+            >
+              <div className="relative bg-gradient-to-r from-amber-950/95 via-black/95 to-amber-950/95 border-2 border-gold-400 rounded-2xl p-4 shadow-[0_0_60px_rgba(234,179,8,0.9)] backdrop-blur-2xl text-center overflow-hidden">
+                {/* Glowing Light Sweep line */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-gold-400/50 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
+                
+                <div className="relative z-10 flex items-center justify-center gap-3">
+                  <div className="p-2.5 rounded-full bg-gradient-to-br from-gold-400 via-amber-500 to-amber-600 text-black shadow-lg animate-bounce">
+                    <Sparkles className="w-6 h-6" />
+                  </div>
+                  <div className="text-left">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-full bg-rose-500 text-white font-mono text-[9px] font-black tracking-widest uppercase animate-pulse">
+                        🔥 BÌNH CHỌN TRỰC TIẾP
+                      </span>
+                      <span className="text-gold-300 text-xs font-mono font-bold">+1 VOTE</span>
+                    </div>
+                    <h4 className="text-sm sm:text-base font-extrabold text-white mt-0.5 drop-shadow">
+                      <span className="text-gold-300">{liveFlash.userName}</span> vừa bình chọn cho <span className="text-amber-300 underline underline-offset-2">{liveFlash.teacherName}</span>!
+                    </h4>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* MAIN FIT-TO-SCREEN DASHBOARD CONTENT */}
       <main className="flex-1 relative z-10 flex flex-col w-full max-w-[1920px] mx-auto overflow-hidden px-2 sm:px-4 pb-2 pt-2">
+        
+        {/* LIVE BALLOT PROGRESS INDICATOR (2 VOTES MANDATORY) */}
+        <div className="w-full max-w-3xl mx-auto mb-2 shrink-0">
+          <div className="bg-gradient-to-r from-amber-950/80 via-black/90 to-amber-950/80 border border-gold-500/30 rounded-xl p-2 sm:p-2.5 flex items-center justify-between gap-3 shadow-[0_0_20px_rgba(212,175,55,0.15)]">
+            <div className="flex items-center gap-2.5">
+              <div className="px-2.5 py-1 rounded-lg bg-gold-500/20 border border-gold-500/40 text-gold-300 font-bold text-xs font-mono shrink-0 flex items-center gap-1">
+                <span>Phiếu:</span>
+                <span className="text-white text-sm font-extrabold">{myVotedTeacherIds.length}/2</span>
+              </div>
+              <div className="text-left">
+                <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                  {myVotedTeacherIds.length === 0 && (
+                    <span className="text-gold-200">🗳️ Bạn có <span className="text-gold-400 font-bold">2 lượt bình chọn</span>. Vui lòng chọn 2 ứng viên xuất sắc nhất!</span>
+                  )}
+                  {myVotedTeacherIds.length === 1 && (
+                    <span className="text-amber-300">⚡ Bạn đã chọn 1/2. Vui lòng chọn <span className="text-gold-400 font-bold">THÊM 1 ứng viên nữa</span> để hoàn tất phiếu!</span>
+                  )}
+                  {myVotedTeacherIds.length >= 2 && (
+                    <span className="text-emerald-400 font-bold flex items-center gap-1">
+                      <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                      ĐÃ HOÀN THÀNH ĐỦ 2/2 LƯỢT BÌNH CHỌN! Cảm ơn bạn!
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {myVotedTeacherIds.length < 2 ? (
+              <span className="text-[10px] text-amber-300/80 font-mono font-bold animate-pulse shrink-0 hidden sm:block">
+                *Bắt buộc bầu đủ 2 lượt
+              </span>
+            ) : (
+              <span className="text-[10px] text-emerald-400 font-mono font-bold shrink-0 hidden sm:block">
+                ✓ Đã hoàn tất phiếu
+              </span>
+            )}
+          </div>
+        </div>
         
         {/* INFO BAR: Title + Categories + Countdown */}
         <div className="flex flex-col lg:flex-row items-center justify-between gap-3 shrink-0 bg-black/20 border border-white/5 rounded-2xl p-2 sm:p-3 backdrop-blur-sm shadow-xl mb-3">
@@ -444,7 +712,7 @@ export default function App() {
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto overflow-x-auto custom-scrollbar pb-1 sm:pb-0">
             {/* CATEGORIES */}
             <div className="flex items-center gap-1 p-1 bg-black/50 border border-gold-500/15 rounded-xl shadow-inner shrink-0">
-              {CATEGORIES.map((cat) => (
+              {categories.map((cat) => (
                 <button
                   key={cat}
                   type="button"
@@ -542,7 +810,7 @@ export default function App() {
                   <div className="border-t border-slate-500/20 pt-3 mt-3 flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-0 relative z-10">
                     <div className="flex items-center gap-1.5 bg-black/30 px-2 py-1 rounded-full border border-slate-500/20">
                       <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500/50" />
-                      <span className="text-xs sm:text-sm font-bold text-slate-200">{rank2.votesCount}</span>
+                      <span className="text-xs sm:text-sm font-bold text-slate-200">{rank2.votesCount === -1 ? '***' : rank2.votesCount}</span>
                     </div>
                     <button
                       type="button"
@@ -635,7 +903,7 @@ export default function App() {
                   <div className="border-t border-yellow-500/20 pt-3 mt-3 flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-0 relative z-10">
                     <div className="flex items-center gap-2 bg-black/40 px-3 py-1.5 rounded-full border border-yellow-500/30">
                       <Heart className="w-4 h-4 text-rose-500 fill-rose-500" />
-                      <span className="text-sm sm:text-base font-bold text-yellow-400">{rank1.votesCount}</span>
+                      <span className="text-sm sm:text-base font-bold text-yellow-400">{rank1.votesCount === -1 ? '***' : rank1.votesCount}</span>
                     </div>
                     <button
                       type="button"
@@ -697,7 +965,7 @@ export default function App() {
                   <div className="border-t border-orange-500/20 pt-2 mt-2 flex flex-col sm:flex-row items-center justify-between gap-1 sm:gap-0 relative z-10">
                     <div className="flex items-center gap-1.5 bg-black/30 px-2 py-1 rounded-full border border-orange-500/20">
                       <Heart className="w-3 h-3 text-rose-500 fill-rose-500/50" />
-                      <span className="text-[10px] sm:text-xs font-bold text-slate-200">{rank3.votesCount}</span>
+                      <span className="text-[10px] sm:text-xs font-bold text-slate-200">{rank3.votesCount === -1 ? '***' : rank3.votesCount}</span>
                     </div>
                     <button
                       type="button"
@@ -785,10 +1053,17 @@ export default function App() {
                     />
                     <div className="absolute -bottom-2 right-0 bg-rose-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full border border-rose-400 shadow-md">
                       <Heart className="w-3 h-3 inline-block mr-1 fill-white" />
-                      {votingTeacher.votesCount}
+                      {votingTeacher.votesCount === -1 ? '***' : votingTeacher.votesCount}
                     </div>
                   </div>
-                  <h4 className="text-lg font-bold text-white mt-3">{votingTeacher.name}</h4>
+                  <h4 className="text-lg font-bold text-white mt-3 flex items-center gap-2">
+                    {votingTeacher.name}
+                    {votingTeacher.youtubeUrl && (
+                      <a href={votingTeacher.youtubeUrl} target="_blank" rel="noopener noreferrer" className="text-red-500 hover:text-red-400">
+                        <Youtube className="w-4 h-4" />
+                      </a>
+                    )}
+                  </h4>
                   <span className="text-[10px] font-mono text-gold-400 bg-gold-950/30 px-2 py-0.5 rounded border border-gold-500/20 mt-1 uppercase">
                     {votingTeacher.category}
                   </span>
@@ -904,6 +1179,79 @@ export default function App() {
             currentUser={user}
             sessionToken={sessionToken}
           />
+        )}
+      </AnimatePresence>
+
+      {/* QR CODE MODAL */}
+      <AnimatePresence>
+        {showQrModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-[#0f0f13] border border-gold-500/30 rounded-2xl p-6 max-w-sm w-full shadow-2xl relative text-center"
+            >
+              <button
+                onClick={() => setShowQrModal(false)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg bg-white/5"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="w-12 h-12 bg-gold-500/10 border border-gold-500/30 rounded-full flex items-center justify-center mx-auto mb-3 text-gold-400">
+                <QrCode className="w-6 h-6" />
+              </div>
+
+              <h3 className="text-lg font-bold text-white font-display">Mã QR Bình Chọn</h3>
+              <p className="text-xs text-slate-400 mt-1">Quét mã để mở trang bình chọn trên điện thoại di động</p>
+
+              <div className="bg-white p-3 rounded-xl inline-block my-4 shadow-lg border border-gold-500/20">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(window.location.href)}`}
+                  alt="Mã QR"
+                  className="w-48 h-48 object-contain mx-auto"
+                />
+              </div>
+
+              <div className="space-y-3 text-left">
+                <div>
+                  <label className="block text-[10px] font-bold text-gold-500/80 uppercase mb-1 font-mono">Đường dẫn trang web</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={window.location.href}
+                      className="flex-1 px-3 py-1.5 bg-black border border-gold-500/20 rounded-lg text-xs text-slate-200 font-mono focus:outline-none"
+                    />
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(window.location.href);
+                        alert("Đã sao chép đường dẫn bình chọn vào bộ nhớ tạm!");
+                      }}
+                      className="px-3 py-1.5 bg-gold-600/20 text-gold-400 border border-gold-500/30 hover:bg-gold-500 hover:text-slate-950 rounded-lg text-xs font-bold transition flex items-center gap-1"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      Sao chép
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <a
+                    href={`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(window.location.href)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download="Ma_QR_BinhChon.png"
+                    className="flex-1 py-2 bg-gradient-to-r from-gold-600 via-gold-500 to-bronze text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-lg text-center"
+                  >
+                    <Download className="w-4 h-4" />
+                    Tải ảnh QR sắc nét
+                  </a>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 

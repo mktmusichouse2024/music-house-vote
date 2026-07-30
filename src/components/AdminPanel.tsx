@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Teacher, VoteLog, User } from "../types";
 import { 
   Lock, Settings, Plus, Edit, Trash2, ToggleLeft, ToggleRight, 
-  RotateCcw, LogOut, Check, Eye, EyeOff, Search, FileSpreadsheet, X, Calendar, Server
+  RotateCcw, LogOut, Check, Eye, EyeOff, Search, FileSpreadsheet, X, Calendar, Server, Upload
 } from "lucide-react";
 
 interface AdminPanelProps {
@@ -18,6 +18,12 @@ interface AdminPanelProps {
     programName: string;
     programSubtitle: string;
     programDescription: string;
+    maxVotesPerCategory: number;
+    maxVotesPerDevice: number;
+    pageTitle: string;
+    hideResults: boolean;
+    candidateTerm?: string;
+    subjectTerm?: string;
   };
 }
 
@@ -48,16 +54,73 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
   const [formCategory, setFormCategory] = useState("Giáo viên được yêu thích nhất");
   const [formBio, setFormBio] = useState("");
   const [formAvatar, setFormAvatar] = useState("");
+  const [formYoutubeUrl, setFormYoutubeUrl] = useState("");
   const [formError, setFormError] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [countdownInput, setCountdownInput] = useState("");
 
-  // Branding state
+  // Branding & Config state
   const [formLogoUrl, setFormLogoUrl] = useState(appConfig?.logoUrl || "/logo.svg");
   const [formProgramName, setFormProgramName] = useState(appConfig?.programName || "Vinh Danh Nhà Giáo");
   const [formProgramSubtitle, setFormProgramSubtitle] = useState(appConfig?.programSubtitle || "Music House");
   const [formProgramDescription, setFormProgramDescription] = useState(appConfig?.programDescription || "Cơ hội để các học viên tri ân những cống hiến thầm lặng và bầu chọn cho người thầy được yêu thích nhất. Hãy cùng tạo ra kết quả công bằng, xứng đáng nhất!");
+  
+  const [formMaxVotesCat, setFormMaxVotesCat] = useState(appConfig?.maxVotesPerCategory?.toString() || "2");
+  const [formMaxVotesDev, setFormMaxVotesDev] = useState(appConfig?.maxVotesPerDevice?.toString() || "2");
+  const [formPageTitle, setFormPageTitle] = useState(appConfig?.pageTitle || "MUSIC HOUSE VOTE");
+  const [formHideResults, setFormHideResults] = useState(appConfig?.hideResults || false);
+  const [formCandidateTerm, setFormCandidateTerm] = useState(appConfig?.candidateTerm || "Giáo viên");
+  const [formSubjectTerm, setFormSubjectTerm] = useState(appConfig?.subjectTerm || "Bộ môn / Thể loại");
+  const [formBgMusicUrl, setFormBgMusicUrl] = useState(appConfig?.bgMusicUrl || "https://assets.mixkit.co/music/preview/mixkit-award-win-fanfare-2022.mp3");
+  const [formVoteSoundUrl, setFormVoteSoundUrl] = useState(appConfig?.voteSoundUrl || "");
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
+
+  const handleUploadAudioFile = async (e: React.ChangeEvent<HTMLInputElement>, targetField: "bgMusic" | "voteSound") => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("audio", file);
+
+    setIsUploadingAudio(true);
+    try {
+      const response = await fetch("/api/admin/upload-audio", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${authToken}` },
+        body: formData
+      });
+      const data = await response.json();
+      if (data.success) {
+        const payload: any = {};
+        if (targetField === "bgMusic") {
+          setFormBgMusicUrl(data.url);
+          payload.bgMusicUrl = data.url;
+        } else {
+          setFormVoteSoundUrl(data.url);
+          payload.voteSoundUrl = data.url;
+        }
+        
+        // Auto-save immediately to server & disk so F5 never reverts to old music
+        await fetch("/api/admin/config", {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${authToken}` 
+          },
+          body: JSON.stringify(payload)
+        });
+        onRefreshData();
+        alert("Đã tải file âm thanh lên và TỰ ĐỘNG LƯU VĨNH VIỄN thành công!");
+      } else {
+        alert(data.message || "Lỗi khi tải file âm thanh.");
+      }
+    } catch (err) {
+      alert("Lỗi kết nối khi tải âm thanh.");
+    } finally {
+      setIsUploadingAudio(false);
+    }
+  };
 
   // Logs state
   const [voteLogs, setVoteLogs] = useState<VoteLog[]>([]);
@@ -65,12 +128,30 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
 
 
 
-  // Load logs if authorized
+  // Sync form state when appConfig prop changes
   useEffect(() => {
-    if (isAuthorized && activeTab === "logs") {
+    if (appConfig) {
+      if (appConfig.candidateTerm) setFormCandidateTerm(appConfig.candidateTerm);
+      if (appConfig.subjectTerm) setFormSubjectTerm(appConfig.subjectTerm);
+      if (appConfig.logoUrl) setFormLogoUrl(appConfig.logoUrl);
+      if (appConfig.programName) setFormProgramName(appConfig.programName);
+      if (appConfig.programSubtitle) setFormProgramSubtitle(appConfig.programSubtitle);
+      if (appConfig.programDescription) setFormProgramDescription(appConfig.programDescription);
+      if (appConfig.pageTitle) setFormPageTitle(appConfig.pageTitle);
+      if (appConfig.maxVotesPerCategory) setFormMaxVotesCat(appConfig.maxVotesPerCategory.toString());
+      if (appConfig.maxVotesPerDevice) setFormMaxVotesDev(appConfig.maxVotesPerDevice.toString());
+      if (appConfig.hideResults !== undefined) setFormHideResults(appConfig.hideResults);
+      if (appConfig.bgMusicUrl) setFormBgMusicUrl(appConfig.bgMusicUrl);
+      if (appConfig.voteSoundUrl) setFormVoteSoundUrl(appConfig.voteSoundUrl);
+    }
+  }, [appConfig]);
+
+  // Load logs & config when authorized
+  useEffect(() => {
+    if (isAuthorized) {
       fetchVoteLogs();
     }
-  }, [isAuthorized, activeTab]);
+  }, [isAuthorized]);
 
   const fetchVoteLogs = async () => {
     if (!authToken) return;
@@ -95,6 +176,12 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
         setFormProgramName(data.config.programName || "Vinh Danh Nhà Giáo");
         setFormProgramSubtitle(data.config.programSubtitle || "Music House");
         setFormProgramDescription(data.config.programDescription || "Cơ hội để các học viên tri ân những cống hiến thầm lặng và bầu chọn cho người thầy được yêu thích nhất. Hãy cùng tạo ra kết quả công bằng, xứng đáng nhất!");
+        setFormMaxVotesCat(data.config.maxVotesPerCategory?.toString() || "2");
+        setFormMaxVotesDev(data.config.maxVotesPerDevice?.toString() || "2");
+        setFormPageTitle(data.config.pageTitle || "MUSIC HOUSE VOTE");
+        setFormHideResults(data.config.hideResults || false);
+        setFormCandidateTerm(data.config.candidateTerm || "Giáo viên");
+        setFormSubjectTerm(data.config.subjectTerm || "Bộ môn / Thể loại");
       }
     } catch (err) {
       console.error("Error fetching logs", err);
@@ -103,10 +190,7 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (currentUser?.email !== "mktmusichouse2024@gmail.com") {
-      setAuthError("Tài khoản này không có quyền truy cập Admin.");
-      return;
-    }
+    setAuthError("");
 
     try {
       const response = await fetch("/api/admin/login", {
@@ -120,7 +204,7 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
         setIsAuthorized(true);
         setPassword("");
       } else {
-        setAuthError(data.message || "Đăng nhập thất bại.");
+        setAuthError(data.message || "Mật khẩu PIN Admin không chính xác.");
       }
     } catch (err) {
       setAuthError("Lỗi kết nối server.");
@@ -200,6 +284,7 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
     setFormCategory("Giáo viên được yêu thích nhất");
     setFormBio("");
     setFormAvatar(PRESET_AVATARS[0]);
+    setFormYoutubeUrl("");
     setFormError("");
     setShowForm(true);
   };
@@ -211,12 +296,13 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
     setFormCategory(teacher.category);
     setFormBio(teacher.bio || "");
     setFormAvatar(teacher.avatar);
+    setFormYoutubeUrl(teacher.youtubeUrl || "");
     setFormError("");
     setShowForm(true);
   };
 
   const handleDeleteTeacher = async (id: string, name: string) => {
-    if (!window.confirm(`Xóa hồ sơ giáo viên "${name}"? Thao tác này sẽ xóa vĩnh viễn giáo viên khỏi danh sách!`)) {
+    if (!window.confirm(`Xóa hồ sơ ${formCandidateTerm || "ứng viên"} "${name}"? Thao tác này sẽ xóa vĩnh viễn khỏi danh sách!`)) {
       return;
     }
     try {
@@ -310,7 +396,15 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
           logoUrl: formLogoUrl,
           programName: formProgramName,
           programSubtitle: formProgramSubtitle,
-          programDescription: formProgramDescription
+          programDescription: formProgramDescription,
+          maxVotesPerCategory: formMaxVotesCat,
+          maxVotesPerDevice: formMaxVotesDev,
+          pageTitle: formPageTitle,
+          hideResults: formHideResults,
+          candidateTerm: formCandidateTerm,
+          subjectTerm: formSubjectTerm,
+          bgMusicUrl: formBgMusicUrl,
+          voteSoundUrl: formVoteSoundUrl
         })
       });
       if (response.status === 401 || response.status === 403) {
@@ -319,7 +413,8 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
       }
       const data = await response.json();
       if (data.success) {
-        alert("Đã lưu thiết lập thương hiệu!");
+        onRefreshData();
+        alert(`Đã lưu thiết lập hệ thống! Danh xưng đã đổi thành: "${formCandidateTerm || "Ứng viên"}"`);
       }
     } catch (error) {
       alert("Lỗi khi lưu cấu hình thương hiệu.");
@@ -338,9 +433,10 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
     const payload = {
       name: formName.trim(),
       subject: formSubject.trim(),
-      category: formCategory,
+      category: formCategory.trim(),
       avatar: formAvatar.trim() || PRESET_AVATARS[0],
-      bio: formBio.trim()
+      bio: formBio.trim(),
+      youtubeUrl: formYoutubeUrl.trim()
     };
 
     try {
@@ -434,7 +530,7 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
               </div>
               <h3 className="text-md font-bold text-[#E5D5B5] mb-1 font-display">Mở khóa bảng điều khiển</h3>
               <p className="text-xs text-slate-400 mb-5 font-sans font-light">
-                Vui lòng nhập mã PIN Admin để truy cập hoặc đăng nhập bằng tài khoản Gmail Admin trên trang chủ.
+                Vui lòng nhập mật khẩu PIN Admin để mở khóa bảng điều khiển Quản trị.
               </p>
               
               <div className="space-y-4">
@@ -469,10 +565,6 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
                     Xác thực PIN Admin
                   </button>
                 </form>
-
-                <div className="text-[11px] text-slate-500 font-sans leading-relaxed text-left border-t border-white/[0.04] pt-3">
-                  <span className="text-gold-400 font-semibold">Bảo mật 2 Lớp:</span> Tính năng tự động đăng nhập đã bị vô hiệu hóa. Bạn bắt buộc phải đăng nhập bằng email Admin ở ngoài trang chủ, sau đó xác thực bằng Mật khẩu Admin tại màn hình này.
-                </div>
               </div>
             </div>
           </div>
@@ -493,7 +585,7 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
                   }`}
                 >
                   <Plus className="w-4 h-4" />
-                  Hồ sơ giáo viên
+                  Hồ sơ {formCandidateTerm || "Ứng viên"}
                 </button>
 
                 <button
@@ -543,7 +635,7 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
               {activeTab === "teachers" && (
                 <div className="space-y-4">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                    <h3 className="text-sm font-bold text-[#E5D5B5] font-display">Quản lý Giáo viên ({teachers.length})</h3>
+                    <h3 className="text-sm font-bold text-[#E5D5B5] font-display">Quản lý {formCandidateTerm || "Ứng viên"} ({teachers.length})</h3>
                     <button
                       id="admin-add-teacher-btn"
                       type="button"
@@ -551,7 +643,7 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
                       className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-gold-600 via-gold-500 to-bronze text-slate-950 text-xs font-bold rounded-lg hover:from-gold-500 hover:to-gold-400 transition-all shadow-lg hover:shadow-gold-500/10 cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      Thêm giáo viên mới
+                      Thêm {formCandidateTerm || "ứng viên"} mới
                     </button>
                   </div>
 
@@ -562,6 +654,7 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
                         <tr className="bg-black/30 border-b border-white/[0.04] text-gold-500/80 font-mono tracking-wider">
                           <th className="p-3">Hồ sơ</th>
                           <th className="p-3">Hạng mục</th>
+                          <th className="p-3 text-center">Lượt Xem</th>
                           <th className="p-3 text-center">Lượt Vote</th>
                           <th className="p-3 text-right">Thao tác</th>
                         </tr>
@@ -580,6 +673,9 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
                               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gold-500/10 border border-gold-500/20 text-gold-400">
                                 {teacher.category}
                               </span>
+                            </td>
+                            <td className="p-3 text-center text-xs font-mono text-slate-400">
+                              {teacher.viewsCount || 0}
                             </td>
                             <td className="p-3 text-center text-sm font-bold text-gold-300 font-mono">
                               {teacher.votesCount}
@@ -621,17 +717,41 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
                       <p className="text-[11px] text-slate-400 font-sans font-light">Thông tin địa chỉ IP, tài khoản Google và thời gian chi tiết.</p>
                     </div>
                     
-                    {/* Search Field */}
-                    <div className="relative max-w-xs">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gold-500/60" />
-                      <input
-                        id="logs-search-input"
-                        type="text"
-                        placeholder="Tìm theo email, tên, IP..."
-                        value={logsSearch}
-                        onChange={(e) => setLogsSearch(e.target.value)}
-                        className="w-full pl-8 pr-3 py-1.5 bg-black border border-gold-500/15 rounded-lg text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-gold-500 transition-all font-mono"
-                      />
+                    <div className="flex flex-col sm:flex-row items-center gap-3">
+                      <button
+                        onClick={async () => {
+                          try {
+                            const res = await fetch('/api/admin/export', {
+                              headers: { 'Authorization': `Bearer ${authToken}` }
+                            });
+                            if (!res.ok) throw new Error('Export failed');
+                            const blob = await res.blob();
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `votes_export_${new Date().toISOString().slice(0,10)}.csv`;
+                            a.click();
+                          } catch (e) {
+                            alert('Lỗi xuất dữ liệu CSV');
+                          }
+                        }}
+                        className="px-3 py-1.5 bg-slate-800 text-white rounded-lg border border-slate-600 hover:bg-slate-700 hover:border-gold-500/50 text-xs font-bold transition-all shadow shadow-black/50"
+                      >
+                        Xuất báo cáo CSV
+                      </button>
+
+                      {/* Search Field */}
+                      <div className="relative max-w-xs w-full">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gold-500/60" />
+                        <input
+                          id="logs-search-input"
+                          type="text"
+                          placeholder="Tìm theo email, tên, IP..."
+                          value={logsSearch}
+                          onChange={(e) => setLogsSearch(e.target.value)}
+                          className="w-full pl-8 pr-3 py-1.5 bg-black border border-gold-500/15 rounded-lg text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-gold-500 transition-all font-mono"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -646,7 +766,7 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
                             <tr className="bg-black/30 border-b border-white/[0.04] text-gold-500/80 font-mono sticky top-0">
                               <th className="p-2.5">Thời gian</th>
                               <th className="p-2.5">Tài khoản</th>
-                              <th className="p-2.5">Giáo viên nhận vote</th>
+                              <th className="p-2.5">{formCandidateTerm || "Ứng viên"} nhận vote</th>
                               <th className="p-2.5 font-mono">Client IP</th>
                             </tr>
                           </thead>
@@ -811,6 +931,156 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
                         </div>
                       </div>
                     </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-gold-500/80 uppercase mb-1 font-mono tracking-wider">
+                          Danh xưng Đối tượng bầu chọn
+                        </label>
+                        <input
+                          type="text"
+                          value={formCandidateTerm}
+                          onChange={(e) => setFormCandidateTerm(e.target.value)}
+                          placeholder="Ví dụ: Giáo viên, Bài hát, Bộ phim, Thí sinh..."
+                          className="w-full px-3 py-2 bg-black border border-gold-500/15 rounded-lg text-sm text-white focus:outline-none focus:border-gold-500 transition-all"
+                        />
+                        <p className="mt-1 text-[10px] text-slate-400">Đổi từ ngữ hiển thị toàn bộ trang (Ví dụ: Thí sinh, Bài hát, Phim, Tác phẩm...)</p>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-gold-500/80 uppercase mb-1 font-mono tracking-wider">
+                          Nhãn thuộc tính phụ / Thể loại
+                        </label>
+                        <input
+                          type="text"
+                          value={formSubjectTerm}
+                          onChange={(e) => setFormSubjectTerm(e.target.value)}
+                          placeholder="Ví dụ: Bộ môn, Ca sĩ / Tác giả, Thể loại..."
+                          className="w-full px-3 py-2 bg-black border border-gold-500/15 rounded-lg text-sm text-white focus:outline-none focus:border-gold-500 transition-all"
+                        />
+                        <p className="mt-1 text-[10px] text-slate-400">Hiển thị dưới tên ứng viên (Ví dụ: Bộ môn, Đạo diễn, Ca sĩ, Tác giả...)</p>
+                      </div>
+                    </div>
+
+                    {/* AUDIO SETTINGS WITH DIRECT FILE UPLOADER */}
+                    <div className="p-4 rounded-xl border border-gold-500/20 bg-black/40 space-y-4">
+                      <h5 className="text-xs font-bold text-gold-400 font-mono uppercase tracking-wider flex items-center gap-1.5">
+                        🎵 Tải Lên & Quản Lý File Âm Thanh
+                      </h5>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* BGM Upload */}
+                        <div>
+                          <label className="block text-[11px] font-bold text-gold-500/80 uppercase mb-1 font-mono tracking-wider">
+                            1. Nhạc Nền Sự Kiện (.mp3)
+                          </label>
+                          <div className="flex gap-2 mb-1">
+                            <input
+                              type="text"
+                              value={formBgMusicUrl}
+                              onChange={(e) => setFormBgMusicUrl(e.target.value)}
+                              placeholder="URL file MP3..."
+                              className="flex-1 px-3 py-1.5 bg-black border border-gold-500/15 rounded-lg text-xs text-white focus:outline-none focus:border-gold-500 transition-all font-mono"
+                            />
+                            <label className="px-3 py-1.5 bg-gold-500/15 hover:bg-gold-500/30 text-gold-300 border border-gold-500/30 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1">
+                              <Upload className="w-3.5 h-3.5" />
+                              Tải MP3 lên
+                              <input
+                                type="file"
+                                accept="audio/*"
+                                onChange={(e) => handleUploadAudioFile(e, "bgMusic")}
+                                className="hidden"
+                                disabled={isUploadingAudio}
+                              />
+                            </label>
+                          </div>
+                          <p className="text-[10px] text-slate-400">Chọn file .mp3 trực tiếp từ máy tính của bạn!</p>
+                        </div>
+
+                        {/* Live Vote Sound Upload */}
+                        <div>
+                          <label className="block text-[11px] font-bold text-gold-500/80 uppercase mb-1 font-mono tracking-wider">
+                            2. Âm Thanh Khi Có Người Vote (.mp3)
+                          </label>
+                          <div className="flex gap-2 mb-1">
+                            <input
+                              type="text"
+                              value={formVoteSoundUrl}
+                              onChange={(e) => setFormVoteSoundUrl(e.target.value)}
+                              placeholder="URL file âm thanh vote..."
+                              className="flex-1 px-3 py-1.5 bg-black border border-gold-500/15 rounded-lg text-xs text-white focus:outline-none focus:border-gold-500 transition-all font-mono"
+                            />
+                            <label className="px-3 py-1.5 bg-gold-500/15 hover:bg-gold-500/30 text-gold-300 border border-gold-500/30 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1">
+                              <Upload className="w-3.5 h-3.5" />
+                              Tải MP3 lên
+                              <input
+                                type="file"
+                                accept="audio/*"
+                                onChange={(e) => handleUploadAudioFile(e, "voteSound")}
+                                className="hidden"
+                                disabled={isUploadingAudio}
+                              />
+                            </label>
+                          </div>
+                          <p className="text-[10px] text-slate-400">Âm thanh này sẽ vang lên cho TẤT CẢ mọi người ngay khi có 1 lượt vote trực tiếp!</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-gold-500/80 uppercase mb-1 font-mono tracking-wider">
+                          Tên thẻ Tab Trình Duyệt
+                        </label>
+                        <input
+                          type="text"
+                          value={formPageTitle}
+                          onChange={(e) => setFormPageTitle(e.target.value)}
+                          placeholder="VD: MUSIC HOUSE VOTE"
+                          className="w-full px-3 py-2 bg-black border border-gold-500/15 rounded-lg text-sm text-white focus:outline-none focus:border-gold-500 transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-gold-500/80 uppercase mb-1 font-mono tracking-wider">
+                          Ẩn điểm số (Blind Voting)
+                        </label>
+                        <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formHideResults}
+                            onChange={(e) => setFormHideResults(e.target.checked)}
+                            className="w-4 h-4 rounded bg-black border-gold-500/30 text-gold-500 focus:ring-gold-500/20"
+                          />
+                          <span className="text-sm text-slate-300">Giấu số vote với người dùng</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-gold-500/80 uppercase mb-1 font-mono tracking-wider">
+                          Tối đa vote / 1 Hạng mục
+                        </label>
+                        <input
+                          type="number"
+                          value={formMaxVotesCat}
+                          onChange={(e) => setFormMaxVotesCat(e.target.value)}
+                          min="1"
+                          className="w-full px-3 py-2 bg-black border border-gold-500/15 rounded-lg text-sm text-white focus:outline-none focus:border-gold-500 transition-all font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-gold-500/80 uppercase mb-1 font-mono tracking-wider">
+                          Tối đa vote / 1 Thiết bị
+                        </label>
+                        <input
+                          type="number"
+                          value={formMaxVotesDev}
+                          onChange={(e) => setFormMaxVotesDev(e.target.value)}
+                          min="1"
+                          className="w-full px-3 py-2 bg-black border border-gold-500/15 rounded-lg text-sm text-white focus:outline-none focus:border-gold-500 transition-all font-mono"
+                        />
+                      </div>
+                    </div>
                     
                     <div>
                       <label className="block text-[11px] font-bold text-gold-500/80 uppercase mb-1 font-mono tracking-wider">
@@ -857,7 +1127,7 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
                     <div className="flex justify-between items-center mb-4 border-b border-white/[0.04] pb-3">
                       <h4 className="text-sm font-bold text-gold-400 flex items-center gap-1.5 uppercase font-display tracking-wider">
                         <Calendar className="w-4 h-4 text-gold-500" />
-                        {editingTeacherId ? `Cập nhật hồ sơ: ${formName}` : "Thêm hồ sơ Giáo viên mới"}
+                        {editingTeacherId ? `Cập nhật hồ sơ: ${formName}` : `Thêm hồ sơ ${formCandidateTerm || "Ứng viên"} mới`}
                       </h4>
                       <button
                         id="close-teacher-form-btn"
@@ -873,13 +1143,13 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label htmlFor="teacher-name-input" className="block text-[11px] font-bold text-gold-500/80 uppercase mb-1 font-mono tracking-wider">
-                            Họ và tên giáo viên *
+                            Tên {formCandidateTerm || "ứng viên / Tiết mục"} *
                           </label>
                           <input
                             id="teacher-name-input"
                             type="text"
                             required
-                            placeholder="Ví dụ: Thầy Hoàng Lâm"
+                            placeholder={`Ví dụ: ${formCandidateTerm === "Tiết Mục" ? "Tiết mục Múa Sạp" : "Hoàng Lâm"}`}
                             value={formName}
                             onChange={(e) => setFormName(e.target.value)}
                             className="w-full px-3 py-2 bg-black border border-gold-500/15 rounded-lg text-sm text-white focus:outline-none focus:border-gold-500 transition-all"
@@ -888,13 +1158,13 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
 
                         <div>
                           <label htmlFor="teacher-subject-input" className="block text-[11px] font-bold text-gold-500/80 uppercase mb-1 font-mono tracking-wider">
-                            Môn học giảng dạy / Chuyên ngành *
+                            {formSubjectTerm || "Bộ môn / Thể loại / Thuộc tính"} *
                           </label>
                           <input
                             id="teacher-subject-input"
                             type="text"
                             required
-                            placeholder="Ví dụ: Tiếng Anh THPT"
+                            placeholder={`Ví dụ: ${formSubjectTerm || "Tiếng Anh THPT / Nhạc dân gian"}`}
                             value={formSubject}
                             onChange={(e) => setFormSubject(e.target.value)}
                             className="w-full px-3 py-2 bg-black border border-gold-500/15 rounded-lg text-sm text-white focus:outline-none focus:border-gold-500 transition-all"
@@ -904,23 +1174,41 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                          <label htmlFor="teacher-category-select" className="block text-[11px] font-bold text-gold-500/80 uppercase mb-1 font-mono tracking-wider">
+                          <label htmlFor="teacher-category-input" className="block text-[11px] font-bold text-gold-500/80 uppercase mb-1 font-mono tracking-wider">
                             Phân nhóm / Danh hiệu *
                           </label>
-                          <select
-                            id="teacher-category-select"
+                          <input
+                            id="teacher-category-input"
+                            list="category-options"
                             value={formCategory}
                             onChange={(e) => setFormCategory(e.target.value)}
+                            placeholder="Nhập hạng mục mới hoặc chọn..."
                             className="w-full px-3 py-2 bg-black border border-gold-500/15 rounded-lg text-sm text-white focus:outline-none focus:border-gold-500 transition-all"
-                          >
-                            <option value="Giáo viên được yêu thích nhất">Giáo viên được yêu thích nhất</option>
-                            <option value="Giáo viên cống hiến nhất">Giáo viên cống hiến nhất</option>
-                          </select>
+                          />
+                          <datalist id="category-options">
+                            {Array.from(new Set(teachers.map(t => t.category))).map(cat => (
+                              <option key={cat} value={cat} />
+                            ))}
+                          </datalist>
+                        </div>
+
+                        <div>
+                          <label htmlFor="teacher-youtube-input" className="block text-[11px] font-bold text-gold-500/80 uppercase mb-1 font-mono tracking-wider">
+                            Link YouTube Tiết mục (Không bắt buộc)
+                          </label>
+                          <input
+                            id="teacher-youtube-input"
+                            type="text"
+                            placeholder="Nhập URL video YouTube..."
+                            value={formYoutubeUrl}
+                            onChange={(e) => setFormYoutubeUrl(e.target.value)}
+                            className="w-full px-3 py-2 bg-black border border-gold-500/15 rounded-lg text-sm text-white focus:outline-none focus:border-gold-500 transition-all font-mono"
+                          />
                         </div>
 
                         <div>
                           <label htmlFor="teacher-avatar-input" className="block text-[11px] font-bold text-gold-500/80 uppercase mb-1 font-mono tracking-wider">
-                            URL ảnh đại diện hoặc Tải lên
+                            URL ảnh đại diện
                           </label>
                           <div className="flex gap-2">
                             <input
@@ -931,22 +1219,8 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
                               onChange={(e) => setFormAvatar(e.target.value)}
                               className="flex-1 px-3 py-2 bg-black border border-gold-500/15 rounded-lg text-sm text-white focus:outline-none focus:border-gold-500 transition-all font-mono"
                             />
-                            <div className="relative">
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleUploadAvatar}
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                              />
-                              <button
-                                type="button"
-                                disabled={isUploading}
-                                className="h-full px-3 bg-gold-600/20 text-gold-400 hover:bg-gold-500 hover:text-slate-950 border border-gold-500/30 rounded-lg text-xs font-bold transition-all whitespace-nowrap"
-                              >
-                                {isUploading ? "Đang tải..." : "Tải ảnh lên"}
-                              </button>
-                            </div>
                           </div>
+                          <p className="mt-1.5 text-xs text-slate-400 font-sans font-light">Copy link ảnh từ Facebook, Google Drive dán vào đây (Render miễn phí không cho lưu ảnh tải lên).</p>
                         </div>
                       </div>
 

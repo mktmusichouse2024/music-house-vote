@@ -1,0 +1,38 @@
+{
+  "config": {
+    "votingEnabled": true,
+    "countdownEnd": null,
+    "logoUrl": "/logo.svg",
+    "programName": "TIẾT MỤC XUẤT SẮC NHẤT",
+    "programSubtitle": "MUSIC HOUSE",
+    "programDescription": "Cơ hội để các học viên tri ân những cống hiến thầm lặng và bầu chọn cho người thầy được yêu thích nhất. Hãy cùng tạo ra kết quả công bằng, xứng đáng nhất!",
+    "maxVotesPerCategory": 2,
+    "maxVotesPerDevice": 2,
+    "pageTitle": "MUSIC HOUSE VOTE",
+    "hideResults": false,
+    "candidateTerm": "TIẾT MỤC",
+    "subjectTerm": "Bộ môn / Thể loại",
+    "bgMusicUrl": "/uploads/1785396125451-nhac_vinh_danh.mp3",
+    "voteSoundUrl": ""
+  },
+  "teachers": [],
+  "votes": [],
+  "sessions": [
+    [
+      "session_2c819ccc7481df67f040c4a6c646df34",
+      {
+        "email": "mktmusichouse2024@gmail.com",
+        "name": "mktmusichouse2024",
+        "createdAt": 1785397020081
+      }
+    ],
+    [
+      "session_guest_83d97tx5zf",
+      {
+        "email": "jkhk_1785400314645@guest.local",
+        "name": "jkhk",
+        "createdAt": 1785400316898
+      }
+    ]
+  ]
+}

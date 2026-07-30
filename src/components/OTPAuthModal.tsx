@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { motion } from "motion/react";
 import { User } from "../types";
-import { Mail, KeyRound, AlertTriangle, Loader2, ArrowRight } from "lucide-react";
+import { UserCheck, AlertTriangle, ArrowRight, Sparkles } from "lucide-react";
 
 interface OTPAuthModalProps {
   onLogin: (user: User, token?: string) => void;
@@ -9,73 +9,32 @@ interface OTPAuthModalProps {
 }
 
 export default function OTPAuthModal({ onLogin, onClose }: OTPAuthModalProps) {
-  const [step, setStep] = useState<"email" | "otp">("email");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSendOTP = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.toLowerCase().endsWith("@gmail.com")) {
-      setError("Vui lòng sử dụng địa chỉ email @gmail.com hợp lệ.");
+    const cleanName = name.trim();
+    if (!cleanName) {
+      setError("Vui lòng nhập Họ & Tên của bạn để bắt đầu bình chọn.");
       return;
     }
-    
-    setIsLoading(true);
-    setError("");
-    
-    try {
-      const response = await fetch("/api/auth/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        setStep("otp");
-      } else {
-        setError(data.message || "Đã có lỗi xảy ra. Vui lòng thử lại.");
-      }
-    } catch (err) {
-      setError("Mất kết nối máy chủ. Vui lòng thử lại.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
-  const handleVerifyOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (otp.length !== 6) {
-      setError("Mã OTP phải có 6 chữ số.");
-      return;
-    }
-    
-    setIsLoading(true);
-    setError("");
-    
-    try {
-      const response = await fetch("/api/auth/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, otp })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        onLogin(data.user, data.token);
-        onClose();
-      } else {
-        setError(data.message || "Mã OTP không chính xác.");
-      }
-    } catch (err) {
-      setError("Mất kết nối máy chủ. Vui lòng thử lại.");
-    } finally {
-      setIsLoading(false);
-    }
+    // Generate unique guest identity
+    const slug = cleanName.toLowerCase().replace(/[^a-z0-9]/g, "") || "guest";
+    const uniqueEmail = email.trim() ? email.trim().toLowerCase() : `${slug}_${Date.now()}@guest.local`;
+    const avatar = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(cleanName)}`;
+    const sessionToken = "session_guest_" + Math.random().toString(36).substring(2, 12);
+
+    const newUser: User = {
+      email: uniqueEmail,
+      name: cleanName,
+      picture: avatar
+    };
+
+    onLogin(newUser, sessionToken);
+    onClose();
   };
 
   return (
@@ -84,7 +43,7 @@ export default function OTPAuthModal({ onLogin, onClose }: OTPAuthModalProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-black/60 backdrop-blur-md"
+        className="absolute inset-0 bg-black/70 backdrop-blur-md"
         onClick={onClose}
       />
       
@@ -92,27 +51,20 @@ export default function OTPAuthModal({ onLogin, onClose }: OTPAuthModalProps) {
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="relative w-full max-w-sm bg-[#0a0a0c]/90 backdrop-blur-xl border border-gold-500/20 rounded-2xl shadow-[0_0_50px_rgba(212,175,55,0.1)] overflow-hidden"
+        className="relative w-full max-w-sm bg-[#0a0a0c]/95 backdrop-blur-xl border border-gold-500/30 rounded-2xl shadow-[0_0_50px_rgba(212,175,55,0.2)] overflow-hidden"
       >
-        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-gold-600 via-gold-400 to-bronze" />
+        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-gold-600 via-gold-400 to-amber-500" />
         
         <div className="p-6 sm:p-8">
           <div className="text-center mb-6">
-            <div className="mx-auto w-12 h-12 bg-gold-950/40 rounded-full flex items-center justify-center border border-gold-500/20 shadow-[0_0_15px_rgba(212,175,55,0.2)] mb-4">
-              {step === "email" ? (
-                <Mail className="w-6 h-6 text-gold-400" />
-              ) : (
-                <KeyRound className="w-6 h-6 text-gold-400" />
-              )}
+            <div className="mx-auto w-14 h-14 bg-gradient-to-br from-gold-500/20 to-amber-600/20 rounded-full flex items-center justify-center border border-gold-500/30 shadow-[0_0_20px_rgba(212,175,55,0.3)] mb-3 animate-pulse">
+              <UserCheck className="w-7 h-7 text-gold-400" />
             </div>
-            <h3 className="text-xl font-black text-[#E5D5B5] font-display uppercase tracking-wider">
-              {step === "email" ? "Đăng Nhập" : "Nhập Mã Xác Nhận"}
+            <h3 className="text-lg sm:text-xl font-black text-[#E5D5B5] font-display uppercase tracking-wider">
+              Xác Nhận Người Bình Chọn
             </h3>
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-              {step === "email" 
-                ? "Sử dụng email hợp lệ để nhận mã xác nhận đăng nhập."
-                : `Mã 6 số đã được gửi tới ${email}`
-              }
+            <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+              Vui lòng nhập tên của bạn để tham gia bình chọn trực tiếp. Mỗi người có đúng <span className="text-gold-300 font-bold">2 lượt bình chọn</span>!
             </p>
           </div>
 
@@ -123,87 +75,43 @@ export default function OTPAuthModal({ onLogin, onClose }: OTPAuthModalProps) {
             </div>
           )}
 
-          {step === "email" ? (
-            <form onSubmit={handleSendOTP} className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-gold-500/80 uppercase tracking-widest mb-1.5">
-                  Email của bạn
-                </label>
-                <div className="relative">
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="vidu@gmail.com"
-                    required
-                    className="w-full bg-black/40 border border-gold-500/20 text-[#E5D5B5] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-gold-500/60 focus:bg-black/60 transition-all placeholder:text-slate-600"
-                  />
-                </div>
-              </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-[11px] font-bold text-gold-500/90 uppercase tracking-wider mb-1">
+                Tên / Biệt danh của bạn <span className="text-rose-400">*</span>
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ví dụ: Nguyễn Văn A, Học viên Tuấn..."
+                required
+                className="w-full bg-black/60 border border-gold-500/30 text-[#E5D5B5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500/50 transition-all placeholder:text-slate-600 font-medium"
+              />
+            </div>
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full relative group overflow-hidden bg-gradient-to-r from-gold-600 via-gold-500 to-bronze text-slate-950 font-black rounded-lg py-3 px-4 flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(212,175,55,0.3)] hover:shadow-[0_0_30px_rgba(212,175,55,0.5)] transition-all disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Đang gửi mã...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Nhận mã OTP</span>
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </>
-                )}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleVerifyOTP} className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-gold-500/80 uppercase tracking-widest mb-1.5 text-center">
-                  Nhập mã 6 số
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="000000"
-                    required
-                    pattern="[0-9]{6}"
-                    className="w-full text-center tracking-[0.5em] text-xl font-mono bg-black/40 border border-gold-500/20 text-[#E5D5B5] rounded-lg px-4 py-3 focus:outline-none focus:border-gold-500/60 focus:bg-black/60 transition-all placeholder:text-slate-600/50"
-                  />
-                </div>
-              </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                Email của bạn (Không bắt buộc)
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="email@vidu.com (Không bắt buộc)"
+                className="w-full bg-black/40 border border-white/10 text-slate-300 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-gold-500/50 transition-all placeholder:text-slate-600"
+              />
+            </div>
 
-              <button
-                type="submit"
-                disabled={isLoading || otp.length !== 6}
-                className="w-full bg-gradient-to-r from-gold-600 via-gold-500 to-bronze text-slate-950 font-black rounded-lg py-3 px-4 flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(212,175,55,0.3)] hover:shadow-[0_0_30px_rgba(212,175,55,0.5)] transition-all disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Đang kiểm tra...</span>
-                  </>
-                ) : (
-                  <span>Hoàn tất Đăng Nhập</span>
-                )}
-              </button>
-              
-              <div className="text-center mt-4">
-                <button
-                  type="button"
-                  onClick={() => setStep("email")}
-                  className="text-xs text-gold-500/60 hover:text-gold-400 font-semibold underline decoration-gold-500/30 underline-offset-4 transition-colors"
-                >
-                  Dùng email khác
-                </button>
-              </div>
-            </form>
-          )}
+            <button
+              type="submit"
+              className="w-full relative group overflow-hidden bg-gradient-to-r from-gold-600 via-gold-500 to-amber-500 text-slate-950 font-black rounded-xl py-3.5 px-4 flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(212,175,55,0.4)] hover:shadow-[0_0_35px_rgba(212,175,55,0.6)] transition-all cursor-pointer mt-2"
+            >
+              <Sparkles className="w-4 h-4 text-slate-950" />
+              <span>Bắt Đầu Bình Chọn (2 Lượt)</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </button>
+          </form>
         </div>
       </motion.div>
     </div>
