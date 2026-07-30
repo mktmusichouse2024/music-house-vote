@@ -1208,19 +1208,43 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
 
                         <div>
                           <label htmlFor="teacher-avatar-input" className="block text-[11px] font-bold text-gold-500/80 uppercase mb-1 font-mono tracking-wider">
-                            URL ảnh đại diện
+                            Ảnh đại diện ứng viên
                           </label>
-                          <div className="flex gap-2">
+                          <div className="flex flex-col sm:flex-row gap-2">
                             <input
                               id="teacher-avatar-input"
                               type="text"
-                              placeholder="Nhập URL ảnh"
+                              placeholder="Dán URL ảnh hoặc chọn nút Tải ảnh bên cạnh"
                               value={formAvatar}
                               onChange={(e) => setFormAvatar(e.target.value)}
                               className="flex-1 px-3 py-2 bg-black border border-gold-500/15 rounded-lg text-sm text-white focus:outline-none focus:border-gold-500 transition-all font-mono"
                             />
+                            <label className="px-3.5 py-2 bg-gold-500/20 border border-gold-500/40 text-gold-300 hover:bg-gold-500 hover:text-slate-950 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0">
+                              <Upload className="w-4 h-4" />
+                              <span>Tải ảnh từ máy</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  if (file.size > 5 * 1024 * 1024) {
+                                    alert("Dung lượng ảnh tối đa là 5MB. Vui lòng chọn ảnh nhỏ hơn.");
+                                    return;
+                                  }
+                                  const reader = new FileReader();
+                                  reader.onload = (event) => {
+                                    if (event.target?.result) {
+                                      setFormAvatar(event.target.result as string);
+                                    }
+                                  };
+                                  reader.readAsDataURL(file);
+                                }}
+                                className="hidden"
+                              />
+                            </label>
                           </div>
-                          <p className="mt-1.5 text-xs text-slate-400 font-sans font-light">Copy link ảnh từ Facebook, Google Drive dán vào đây (Render miễn phí không cho lưu ảnh tải lên).</p>
+                          <p className="mt-1.5 text-xs text-slate-400 font-sans font-light">Bấm "Tải ảnh từ máy" chọn hình từ máy tính hoặc dán đường dẫn link ảnh Facebook/Google Drive vào ô trên.</p>
                         </div>
                       </div>
 

@@ -219,7 +219,7 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-const ADMIN_TOKEN = "admin_" + crypto.randomBytes(16).toString("hex");
+const ADMIN_TOKEN = "admin_token_Phongmktmusichouse_2026";
 
 // Clean up jobs
 setInterval(() => {
