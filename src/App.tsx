@@ -384,10 +384,10 @@ export default function App() {
         layout
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: isLiveFlashed ? 1.08 : 1 }}
-        className={`group relative rounded-xl border bg-[#0c0c0e]/80 hover:bg-[#0c0c0e]/95 transition-all p-1.5 sm:p-2 flex flex-col justify-between w-full min-w-[120px] max-w-[180px] ${
+        className={`group relative rounded-xl border bg-[#0c0c0e]/90 hover:bg-[#0c0c0e]/98 transition-all p-2.5 flex flex-col justify-between w-full ${
           isLiveFlashed 
             ? "border-gold-400 ring-2 ring-gold-400 shadow-[0_0_35px_rgba(234,179,8,1)] animate-pulse" 
-            : "border-white/[0.04] hover:border-gold-500/30 shadow-[0_5px_15px_rgba(0,0,0,0.5)]"
+            : "border-white/10 hover:border-gold-500/40 shadow-[0_5px_15px_rgba(0,0,0,0.5)]"
         }`}
       >
         {isLiveFlashed && (
@@ -407,32 +407,32 @@ export default function App() {
             <img
               src={teacher.avatar}
               alt={teacher.name}
-              className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-slate-950 shadow-lg"
+              className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border border-slate-950 shadow-lg"
               referrerPolicy="no-referrer"
             />
-            <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-slate-900 border border-white/10 rounded-full flex items-center justify-center font-bold text-[9px] font-mono text-slate-400">
-              {realRank}
+            <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-slate-900 border border-gold-500/30 rounded-full flex items-center justify-center font-bold text-[9px] font-mono text-gold-400">
+              #{realRank}
             </div>
           </div>
           
-          <h3 className="text-[11px] sm:text-xs font-bold text-center text-white group-hover:text-gold-300 font-display line-clamp-1 flex items-center gap-1">
-            {teacher.name}
+          <h3 className="text-xs sm:text-sm font-bold text-center text-white group-hover:text-gold-300 font-display line-clamp-2 leading-tight flex items-center justify-center gap-1">
+            <span>{teacher.name}</span>
             {teacher.youtubeUrl && (
-              <a href={teacher.youtubeUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-red-500 hover:text-red-400">
-                <Youtube className="w-3 h-3" />
+              <a href={teacher.youtubeUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-red-500 hover:text-red-400 shrink-0">
+                <Youtube className="w-3.5 h-3.5" />
               </a>
             )}
           </h3>
-          <span className="text-[8px] font-bold tracking-widest text-gold-400/80 uppercase font-mono mt-0.5 line-clamp-1">
+          <span className="text-[9px] font-bold tracking-widest text-gold-400/90 uppercase font-mono mt-1 line-clamp-1">
             {teacher.subject}
           </span>
         </div>
 
-        <div className="pt-2 mt-2 border-t border-white/[0.02] flex items-center justify-between w-full">
-          <div className="flex items-center gap-2">
+        <div className="pt-2 mt-2 border-t border-white/10 flex items-center justify-between w-full gap-1">
+          <div className="flex items-center gap-1.5">
             <div className="flex items-center gap-1">
-              <Heart className="w-3 h-3 text-rose-500" />
-              <span className="text-[10px] font-bold font-mono text-white">{teacher.votesCount === -1 ? '***' : teacher.votesCount}</span>
+              <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500/50" />
+              <span className="text-xs font-bold font-mono text-white">{teacher.votesCount === -1 ? '***' : teacher.votesCount}</span>
             </div>
             <div className="flex items-center gap-0.5 text-[9px] font-mono text-slate-400" title="Số lượt xem">
               <Eye className="w-2.5 h-2.5 text-gold-400/80" />
@@ -444,13 +444,13 @@ export default function App() {
             type="button"
             disabled={!votingEnabled}
             onClick={() => openVotingFlow(teacher)}
-            className={`px-2 py-1 rounded text-[9px] font-bold transition-all shadow-sm ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all shadow-md flex items-center justify-center gap-1 shrink-0 ${
               votingEnabled
-                ? "bg-gold-950/40 hover:bg-gold-500 text-gold-400 hover:text-slate-950 border border-gold-500/30"
-                : "bg-black/40 text-slate-600 border border-white/5"
+                ? "bg-gradient-to-r from-gold-500 via-amber-400 to-gold-500 text-slate-950 hover:scale-105 active:scale-95 shadow-[0_0_12px_rgba(234,179,8,0.4)] cursor-pointer"
+                : "bg-black/40 text-slate-600 border border-white/5 cursor-not-allowed"
             }`}
           >
-            Bầu
+            <span>Bầu chọn</span>
           </button>
         </div>
       </motion.div>
@@ -458,7 +458,7 @@ export default function App() {
   };
 
   return (
-    <div className="relative h-screen bg-[#02050f] text-[#f3f4f6] overflow-hidden font-sans flex flex-col w-full">
+    <div className="relative min-h-screen sm:h-screen bg-[#02050f] text-[#f3f4f6] overflow-y-auto sm:overflow-hidden font-sans flex flex-col w-full">
       
       {/* GRAND AWARD DYNAMIC BACKGROUND */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
@@ -657,7 +657,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* MAIN FIT-TO-SCREEN DASHBOARD CONTENT */}
-      <main className="flex-1 relative z-10 flex flex-col w-full max-w-[1920px] mx-auto overflow-hidden px-2 sm:px-4 pb-2 pt-2">
+      <main className="flex-1 relative z-10 flex flex-col w-full max-w-[1920px] mx-auto overflow-y-auto sm:overflow-hidden px-2 sm:px-4 pb-20 sm:pb-2 pt-2">
         
         {/* LIVE BALLOT PROGRESS INDICATOR (2 VOTES MANDATORY) */}
         <div className="w-full max-w-3xl mx-auto mb-2 shrink-0">
@@ -753,7 +753,7 @@ export default function App() {
             Chưa có giáo viên nào thuộc danh mục này.
           </div>
         ) : (
-          <div className="flex-1 flex flex-col w-full h-full min-h-0 overflow-hidden relative pb-1">
+          <div className="flex-1 flex flex-col w-full h-full min-h-0 overflow-y-auto sm:overflow-hidden relative pb-1">
             
             {/* HYBRID FLANKED PODIUM LAYOUT */}
             <div className="w-full max-w-[1400px] shrink-0 mx-auto px-2 relative z-20 mb-6 sm:mb-8 flex flex-col lg:flex-row items-end justify-center gap-4 xl:gap-8">
@@ -768,7 +768,7 @@ export default function App() {
               </div>
 
               {/* TOP 3 PODIUM */}
-              <div className="w-full lg:w-auto lg:flex-1 max-w-4xl h-[320px] sm:h-[360px] relative z-20 origin-bottom scale-[0.75] xl:scale-85 transition-transform">
+              <div className="w-full lg:w-auto lg:flex-1 max-w-4xl h-[320px] sm:h-[360px] relative z-20 origin-bottom scale-90 sm:scale-100 lg:scale-[0.75] xl:scale-85 transition-transform">
                 {/* Podium display */}
                 <div className="flex items-end justify-center gap-2 sm:gap-4 h-full pt-16 sm:pt-20 pb-4">
                 
@@ -1006,8 +1006,8 @@ export default function App() {
 
           {/* REMAINING TEACHERS - AUTO SCALING DENSE GRID */}
           <div className="flex-1 w-full flex flex-col content-start justify-start px-2 sm:px-4 pb-4 overflow-y-auto custom-scrollbar z-20">
-            {/* Mobile: all remaining */}
-            <div className="lg:hidden flex flex-wrap justify-center content-start gap-2 sm:gap-3 w-full">
+            {/* Mobile: clean 2-column grid for remaining candidates */}
+            <div className="lg:hidden grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 w-full max-w-2xl mx-auto pb-24">
               {remainingTeachers.map((teacher, idx) => renderTeacherCard(teacher, idx + 4))}
             </div>
             {/* Desktop: skip first 4 */}

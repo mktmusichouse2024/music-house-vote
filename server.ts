@@ -185,7 +185,7 @@ function loadLocalStore() {
     if (fs.existsSync(STORE_PATH)) {
       const data = JSON.parse(fs.readFileSync(STORE_PATH, "utf-8"));
       if (data.config) memoryConfig = { ...memoryConfig, ...data.config };
-      if (data.teachers && Array.isArray(data.teachers) && data.teachers.length > 0) memoryTeachers = data.teachers;
+      if (data.teachers && Array.isArray(data.teachers)) memoryTeachers = data.teachers;
       if (data.votes && Array.isArray(data.votes)) memoryVotes = data.votes;
       if (data.sessions && Array.isArray(data.sessions)) {
         data.sessions.forEach(([k, v]: [string, any]) => userSessions.set(k, v));
