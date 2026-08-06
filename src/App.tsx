@@ -119,6 +119,8 @@ export default function App() {
           hideResults: data.config.hideResults || false,
           candidateTerm: data.config.candidateTerm || "Giáo viên",
           subjectTerm: data.config.subjectTerm || "Bộ môn / Thể loại",
+          maxVotesPerCategory: data.config.maxVotesPerCategory || 2,
+          maxVotesPerDevice: data.config.maxVotesPerDevice || 2,
           bgMusicUrl: data.config.bgMusicUrl,
           voteSoundUrl: data.config.voteSoundUrl
         });
