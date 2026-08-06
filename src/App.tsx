@@ -290,8 +290,9 @@ export default function App() {
       setShowAuthModal(true);
       return;
     }
-    if (myVotedTeacherIds.length >= 2) {
-      alert("Bạn đã sử dụng đủ 2/2 lượt bình chọn! Cảm ơn bạn đã tham gia.");
+    const maxVotes = appConfig.maxVotesPerDevice || 2;
+    if (myVotedTeacherIds.length >= maxVotes) {
+      alert(`Bạn đã sử dụng đủ ${maxVotes}/${maxVotes} lượt bình chọn! Cảm ơn bạn đã tham gia.`);
       return;
     }
     fetch(`/api/teachers/${teacher.id}/view`, { method: "POST" });
