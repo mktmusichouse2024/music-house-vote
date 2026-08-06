@@ -257,6 +257,26 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
     }
   };
 
+  const handleResetDevices = async () => {
+    if (!confirm("Bạn có chắc chắn muốn XÓA BỘ NHỚ THIẾT BỊ? Tất cả thiết bị đã bình chọn sẽ được mở khóa để bầu chọn lại từ đầu mà KHÔNG xóa điểm số của ứng viên.")) {
+      return;
+    }
+    try {
+      const response = await fetch("/api/admin/reset-devices", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${authToken}`
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        alert("Đã xóa bộ nhớ thiết bị thành công! Tất cả thiết bị trên toàn hệ thống đã có thể tiếp tục bình chọn.");
+      }
+    } catch (err) {
+      console.error("Error resetting devices", err);
+    }
+  };
+
   const handleSaveCountdown = async () => {
     try {
       const response = await fetch("/api/admin/countdown", {
@@ -842,6 +862,24 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
                       </button>
                     </div>
 
+                    <div className="border-t border-white/[0.04] pt-4 flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <div className="text-sm font-semibold text-amber-400 flex items-center gap-1.5 font-mono">
+                          <RotateCcw className="w-4 h-4" />
+                          Xóa bộ nhớ thiết bị (Quên thiết bị cũ)
+                        </div>
+                        <div className="text-xs text-slate-400 font-sans font-light">Cho phép tất cả thiết bị/điện thoại đã vote được mở khóa bầu chọn lại từ đầu mà KHÔNG xóa điểm số của ứng viên.</div>
+                      </div>
+                      <button
+                        id="admin-reset-devices-btn"
+                        type="button"
+                        onClick={handleResetDevices}
+                        className="px-3.5 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500 hover:text-slate-950 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                      >
+                        Reset bộ nhớ thiết bị
+                      </button>
+                    </div>
+
                     <div className="border-t border-white/[0.04] pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="space-y-0.5">
                         <div className="text-sm font-semibold text-white flex items-center gap-1.5 font-mono">
@@ -958,6 +996,24 @@ export default function AdminPanel({ teachers, votingEnabled, appConfig, onRefre
                           className="w-full px-3 py-2 bg-black border border-gold-500/15 rounded-lg text-sm text-white focus:outline-none focus:border-gold-500 transition-all"
                         />
                         <p className="mt-1 text-[10px] text-slate-400">Hiển thị dưới tên ứng viên (Ví dụ: Bộ môn, Đạo diễn, Ca sĩ, Tác giả...)</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-gold-500/80 uppercase mb-1 font-mono tracking-wider">
+                          Số lượt bình chọn tối đa cho mỗi thiết bị
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="50"
+                          value={formMaxVotesDev}
+                          onChange={(e) => setFormMaxVotesDev(e.target.value)}
+                          placeholder="Mặc định là 2"
+                          className="w-full px-3 py-2 bg-black border border-gold-500/15 rounded-lg text-sm text-white focus:outline-none focus:border-gold-500 transition-all font-mono"
+                        />
+                        <p className="mt-1 text-[10px] text-slate-400">Tùy chỉnh số lượt bình chọn cho mỗi khách hàng (Ví dụ: 1, 2, 3, 5, 10 lượt...)</p>
                       </div>
                     </div>
 

@@ -762,6 +762,20 @@ async function startServer() {
     }
   });
 
+  app.post("/api/admin/reset-devices", async (req, res) => {
+    if (req.headers.authorization !== `Bearer ${ADMIN_TOKEN}`) return res.status(403).json({ success: false });
+    try {
+      memoryVotes = [];
+      try {
+        await VoteModel.deleteMany({});
+      } catch (dbErr) {}
+
+      broadcastEvent("reset_devices", { timestamp: Date.now() });
+      saveLocalStore();
+      res.json({ success: true, message: "Đã xóa bộ nhớ thiết bị thành công! Tất cả thiết bị có thể tiếp tục bình chọn." });
+    } catch(err) { res.status(500).json({ success: false }); }
+  });
+
   app.post("/api/admin/reset", async (req, res) => {
     if (req.headers.authorization !== `Bearer ${ADMIN_TOKEN}`) return res.status(403).json({ success: false });
     try {
@@ -773,6 +787,7 @@ async function startServer() {
         await TeacherModel.updateMany({}, { votesCount: 0 });
       } catch (dbErr) {}
 
+      broadcastEvent("reset_devices", { timestamp: Date.now() });
       broadcastEvent("sync", { teachers: memoryTeachers, config: memoryConfig });
       res.json({ success: true, teachers: memoryTeachers });
     } catch(err) { res.status(500).json({ success: false }); }

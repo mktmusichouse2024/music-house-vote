@@ -175,6 +175,7 @@ export default function App() {
         hideResults: data.hideResults || false,
         candidateTerm: data.candidateTerm || "Giáo viên",
         subjectTerm: data.subjectTerm || "Bộ môn / Thể loại",
+        maxVotesPerDevice: data.maxVotesPerDevice || 2,
         bgMusicUrl: data.bgMusicUrl,
         voteSoundUrl: data.voteSoundUrl
       });
@@ -183,6 +184,11 @@ export default function App() {
       if (data.pageTitle) {
         document.title = data.pageTitle;
       }
+    });
+
+    eventSource.addEventListener("reset_devices", () => {
+      localStorage.removeItem("my_voted_teacher_ids");
+      setMyVotedTeacherIds([]);
     });
 
     return () => {
@@ -243,6 +249,7 @@ export default function App() {
             hideResults: data.config.hideResults || false,
             candidateTerm: data.config.candidateTerm || "Giáo viên",
             subjectTerm: data.config.subjectTerm || "Bộ môn / Thể loại",
+            maxVotesPerDevice: data.config.maxVotesPerDevice || 2,
             bgMusicUrl: data.config.bgMusicUrl,
             voteSoundUrl: data.config.voteSoundUrl
           });
@@ -659,35 +666,35 @@ export default function App() {
       {/* MAIN FIT-TO-SCREEN DASHBOARD CONTENT */}
       <main className="flex-1 relative z-10 flex flex-col w-full max-w-[1920px] mx-auto overflow-y-auto sm:overflow-hidden px-2 sm:px-4 pb-20 sm:pb-2 pt-2">
         
-        {/* LIVE BALLOT PROGRESS INDICATOR (2 VOTES MANDATORY) */}
+        {/* LIVE BALLOT PROGRESS INDICATOR */}
         <div className="w-full max-w-3xl mx-auto mb-2 shrink-0">
           <div className="bg-gradient-to-r from-amber-950/80 via-black/90 to-amber-950/80 border border-gold-500/30 rounded-xl p-2 sm:p-2.5 flex items-center justify-between gap-3 shadow-[0_0_20px_rgba(212,175,55,0.15)]">
             <div className="flex items-center gap-2.5">
               <div className="px-2.5 py-1 rounded-lg bg-gold-500/20 border border-gold-500/40 text-gold-300 font-bold text-xs font-mono shrink-0 flex items-center gap-1">
                 <span>Phiếu:</span>
-                <span className="text-white text-sm font-extrabold">{myVotedTeacherIds.length}/2</span>
+                <span className="text-white text-sm font-extrabold">{myVotedTeacherIds.length}/{appConfig.maxVotesPerDevice || 2}</span>
               </div>
               <div className="text-left">
                 <div className="text-xs font-bold text-white flex items-center gap-1.5">
                   {myVotedTeacherIds.length === 0 && (
-                    <span className="text-gold-200">🗳️ Bạn có <span className="text-gold-400 font-bold">2 lượt bình chọn</span>. Vui lòng chọn 2 ứng viên xuất sắc nhất!</span>
+                    <span className="text-gold-200">🗳️ Bạn có <span className="text-gold-400 font-bold">{appConfig.maxVotesPerDevice || 2} lượt bình chọn</span>. Vui lòng chọn {appConfig.maxVotesPerDevice || 2} ứng viên xuất sắc nhất!</span>
                   )}
-                  {myVotedTeacherIds.length === 1 && (
-                    <span className="text-amber-300">⚡ Bạn đã chọn 1/2. Vui lòng chọn <span className="text-gold-400 font-bold">THÊM 1 ứng viên nữa</span> để hoàn tất phiếu!</span>
+                  {myVotedTeacherIds.length > 0 && myVotedTeacherIds.length < (appConfig.maxVotesPerDevice || 2) && (
+                    <span className="text-amber-300">⚡ Bạn đã chọn {myVotedTeacherIds.length}/{appConfig.maxVotesPerDevice || 2}. Vui lòng chọn <span className="text-gold-400 font-bold">THÊM {(appConfig.maxVotesPerDevice || 2) - myVotedTeacherIds.length} ứng viên nữa</span> để hoàn tất phiếu!</span>
                   )}
-                  {myVotedTeacherIds.length >= 2 && (
+                  {myVotedTeacherIds.length >= (appConfig.maxVotesPerDevice || 2) && (
                     <span className="text-emerald-400 font-bold flex items-center gap-1">
                       <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-                      ĐÃ HOÀN THÀNH ĐỦ 2/2 LƯỢT BÌNH CHỌN! Cảm ơn bạn!
+                      ĐÃ HOÀN THÀNH ĐỦ {appConfig.maxVotesPerDevice || 2}/{appConfig.maxVotesPerDevice || 2} LƯỢT BÌNH CHỌN! Cảm ơn bạn!
                     </span>
                   )}
                 </div>
               </div>
             </div>
 
-            {myVotedTeacherIds.length < 2 ? (
+            {myVotedTeacherIds.length < (appConfig.maxVotesPerDevice || 2) ? (
               <span className="text-[10px] text-amber-300/80 font-mono font-bold animate-pulse shrink-0 hidden sm:block">
-                *Bắt buộc bầu đủ 2 lượt
+                *Bắt buộc bầu đủ {appConfig.maxVotesPerDevice || 2} lượt
               </span>
             ) : (
               <span className="text-[10px] text-emerald-400 font-mono font-bold shrink-0 hidden sm:block">
