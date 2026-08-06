@@ -673,7 +673,7 @@ export default function App() {
             <div className="flex items-center gap-2.5">
               <div className="px-2.5 py-1 rounded-lg bg-gold-500/20 border border-gold-500/40 text-gold-300 font-bold text-xs font-mono shrink-0 flex items-center gap-1">
                 <span>Phiếu:</span>
-                <span className="text-white text-sm font-extrabold">{myVotedTeacherIds.length}/{appConfig.maxVotesPerDevice || 2}</span>
+                <span className="text-white text-sm font-extrabold">{Math.min(myVotedTeacherIds.length, appConfig.maxVotesPerDevice || 2)}/{appConfig.maxVotesPerDevice || 2}</span>
               </div>
               <div className="text-left">
                 <div className="text-xs font-bold text-white flex items-center gap-1.5">
