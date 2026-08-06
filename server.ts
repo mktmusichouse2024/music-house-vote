@@ -619,10 +619,7 @@ async function startServer() {
       saveLocalStore();
 
       try {
-        let configDoc = await ConfigModel.findOne();
-        if (!configDoc) configDoc = new ConfigModel(memoryConfig);
-        Object.assign(configDoc, memoryConfig);
-        await configDoc.save();
+        await ConfigModel.findOneAndUpdate({}, { $set: memoryConfig }, { upsert: true, new: true });
       } catch (dbErr) {}
 
       broadcastEvent("config", memoryConfig);
