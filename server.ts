@@ -244,6 +244,14 @@ async function startServer() {
   app.use(express.json({ limit: "100mb" }));
   app.use(express.urlencoded({ limit: "100mb", extended: true }));
   
+  // Disable browser caching for static & HTML assets to enforce immediate live updates
+  app.use((req, res, next) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    next();
+  });
+  
   // Serve uploaded files
   const uploadDir = path.join(process.cwd(), "public/uploads");
   const distUploadDir = path.join(process.cwd(), "dist/uploads");
