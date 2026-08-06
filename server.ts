@@ -121,8 +121,8 @@ let memoryConfig: any = {
   programName: "Vinh Danh Nhà Giáo",
   programSubtitle: "Music House",
   programDescription: "Cơ hội để các học viên tri ân những cống hiến thầm lặng và bầu chọn cho người thầy được yêu thích nhất. Hãy cùng tạo ra kết quả công bằng, xứng đáng nhất!",
-  maxVotesPerCategory: 2,
-  maxVotesPerDevice: 2,
+  maxVotesPerCategory: 3,
+  maxVotesPerDevice: 3,
   pageTitle: "MUSIC HOUSE VOTE",
   hideResults: false,
   candidateTerm: "Giáo viên",
@@ -135,12 +135,13 @@ let memoryTeachers: any[] = [...DEFAULT_TEACHERS];
 let memoryVotes: any[] = [];
 
 async function getConfig() {
-  if (mongoose.connection.readyState !== 1) return memoryConfig;
   try {
-    const doc = await ConfigModel.findOne().lean();
-    if (doc) {
-      memoryConfig = doc;
-      return doc;
+    if (mongoose.connection.readyState === 1) {
+      const doc = await ConfigModel.findOne().lean();
+      if (doc) {
+        memoryConfig = { ...memoryConfig, ...doc };
+        return memoryConfig;
+      }
     }
   } catch (e) {}
   return memoryConfig;
