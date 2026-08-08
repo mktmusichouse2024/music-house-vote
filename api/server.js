@@ -227,4 +227,6 @@ app.get("/api/events", (req, res) => {
   res.end();
 });
 
-module.exports = app;
+module.exports = (req, res) => {
+  return app(req, res);
+};
