@@ -237,8 +237,9 @@ setInterval(() => {
   }
 }, 600000);
 
+export const app = express();
+
 async function startServer() {
-  const app = express();
   const PORT = process.env.PORT || 3000;
 
   app.use(express.json({ limit: "100mb" }));
@@ -808,9 +809,15 @@ async function startServer() {
     app.get("*", (req, res) => res.sendFile(path.join(distPath, "index.html")));
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  if (process.env.VERCEL !== "1") {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
 }
 
-startServer();
+if (process.env.VERCEL !== "1") {
+  startServer();
+}
+
+export default app;
